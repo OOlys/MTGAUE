@@ -1,0 +1,676 @@
+---
+title: "Monkey"
+
+Documentation:
+
+Multiple tests based on a Gaussian approximation of the Unitary Events method with delayed coincidence count
+Christine Tuleau-Malot,Amel Rouis,Franck Grammont,Patricia Reynaud-Bouret
+
+Dveloppement informatique de l'algorithme MTGAUE - Journe axe interdisciplinaire MTC-NSC
+Christine Tuleau-Malot
+
+
+output: html_document
+---
+
+```{r}
+library(data.table)
+
+```
+
+#Read data - simulated neurons
+```{r setup, include=FALSE}
+setwd("~/DSTI/Neurons")
+neuron1simu<-read.csv("neuron1.txt",sep=" ",header=FALSE)
+neuron2simu<-read.csv("neuron2.txt",sep=" ",header=FALSE)
+```
+
+#Read data - reals neurons
+```{r}
+setwd("~/DSTI/Neurons/Desktop")
+neuron113<-read.csv("neur1_13.txt",sep=" ",header=FALSE)
+neuron140<-read.csv("neur1_40.txt",sep=" ",header=FALSE)
+neuron213<-read.csv("neur2_13.txt",sep=" ",header=FALSE)
+neuron240<-read.csv("neur2_40.txt",sep=" ",header=FALSE)
+```
+
+
+neuron1simu, neuron2simu: simu of 1 experiment, 2 neurons
+neuron113,neuron213: one exp, 2 neurons
+neuron140,neuron240: one exp, 2 neurons
+
+nb of peaks in the first column of each data set
+
+```{r}
+#Check that each dataset have the same number of observations.
+nobs1=nrow(neuron1simu)	
+nobs2=nrow(neuron2simu)	
+ifelse(nobs1!=nobs2,
+  print("Problem: the two datasets don't have the same number of observations"),
+  print(paste("The datasets each have ",nobs1," observations."))
+  )
+```
+
+#Nb of spikes in the window - no shift
+```{r}
+CountSpikePerWindow=function(dataset1,dataset2,start,end){
+  
+nobs1=nrow(dataset1)	
+nobs2=nrow(dataset2)	
+
+#Check that the two datasets have the same numbers of obs
+if(nobs1==nobs2){
+nobs=nobs1
+
+CountSpikes=function(obs,start,end,CountSpikes=0){
+for(i in obs){
+  if(i>=start & i<=end){
+    CountSpikes=CountSpikes+1
+      }
+    }
+  return(CountSpikes)
+}
+
+listCountSpikes1=c()
+listCountSpikes2=c()
+
+	for (row in 1:nobs){
+	obs1=dataset1[row,]	
+	#print(obs1)
+	obs2=dataset2[row,]
+	
+	#Obs without 0
+	spikes1=as.numeric(obs1[1])	
+  obs1=as.list(obs1[,2:(spikes1+1)])
+  #print(obs1)
+	spikes2=as.numeric(obs2[1])
+  obs2=as.list(obs2[,2:(spikes2+1)])
+  
+  #Count spikes
+  #print(CountSpikes(obs1,0.02,0.2))
+  listCountSpikes1=c(listCountSpikes1,CountSpikes(obs1,start,end))
+  listCountSpikes2=c(listCountSpikes2,CountSpikes(obs2,start,end))
+  CountAllSpikes=cbind(listCountSpikes1,listCountSpikes2)
+	}
+return(CountAllSpikes)
+}
+else{
+    print("Problem: the two datasets don't have the same number of observations")
+}  
+}
+```
+
+Test with simulations (too see if we catch all the spikes)
+```{r}
+maxval=max(max(neuron1simu[,2:length(neuron1simu)]),max(neuron2simu[,2:length(neuron2simu)]))
+a=CountSpikePerWindow(neuron1simu,neuron2simu,0,0.2)
+b=CountSpikePerWindow(neuron1simu,neuron2simu,0.2000001,maxval)
+c=a+b
+ifelse(mean((c[,1]-neuron1simu[,1])+(c[,2]-neuron2simu[,1]))==0,"Ok","Pb not the good count!")
+```
+
+#Catch spikes- no shift
+```{r}
+CatchSpikePerWindow=function(dataset1,dataset2,start,end){
+  
+nobs1=nrow(dataset1)	
+nobs2=nrow(dataset2)	
+
+#Check that the two datasets have the same numbers of obs
+if(nobs1==nobs2){
+nobs=nobs1
+
+CatchSpikes=function(obs,start,end,CatchSpikes=c()){
+for(i in obs){
+  if(i>=start & i<=end){
+    CatchSpikes=c(CatchSpikes,i)
+      }
+    }
+  return(CatchSpikes)
+}
+
+listCatchSpikes1=c()
+listCatchSpikes2=c()
+
+	for (row in 1:nobs){
+	obs1=dataset1[row,]	
+	#print(obs1)
+	obs2=dataset2[row,]
+	
+	#Obs without 0
+	spikes1=as.numeric(obs1[1])	
+  obs1=as.list(obs1[,2:(spikes1+1)])
+  #print(obs1)
+	spikes2=as.numeric(obs2[1])
+  obs2=as.list(obs2[,2:(spikes2+1)])
+  
+  #Count spikes
+  #print(CountSpikes(obs1,0.02,0.2))
+  temp1=CatchSpikes(obs1,start,end)
+  temp2=CatchSpikes(obs2,start,end)
+  listCatchSpikes1=c(listCatchSpikes1,list(temp1))
+  listCatchSpikes2=c(listCatchSpikes2,list(temp2))
+  CatchAllSpikes=cbind(listCatchSpikes1,listCatchSpikes2)
+	}
+return(CatchAllSpikes)
+}
+else{
+    print("Problem: the two datasets don't have the same number of observations")
+}  
+}
+```
+
+
+Test with simulations
+```{r}
+Catch=CatchSpikePerWindow(neuron1simu,neuron2simu,0.02,0.2)
+Count=CountSpikePerWindow(neuron1simu,neuron2simu,0.02,0.2)
+smallcount1=c()
+smallcount2=c()
+for(i in Catch[,1]){
+  c=0
+  for(j in i){
+    c=c+1
+  }
+  smallcount1=c(smallcount1,c)
+}
+for(i in Catch[,2]){
+  c=0
+  for(j in i){
+    c=c+1
+  }
+  smallcount2=c(smallcount2,c)
+}
+smallcount=cbind(smallcount1,smallcount2)
+
+if(mean((smallcount[,1]-Count[,1])+(smallcount[,2]-Count[,2]))==0){
+  print("Ok all catch!")}else{print("Pb to check, not everything catch!")}
+```
+
+
+#Coincidence count
+```{r}
+CoincCount<-function(dataset1,dataset2,start,end,delta){
+Coincidences=c()
+Catchdf<-as.data.frame(CatchSpikePerWindow(dataset1,dataset2,start,end))
+for(i in 1:(nrow(Catchdf))){
+  Neuron1=unlist(Catchdf$listCatchSpikes1[i])
+  Neuron2=unlist(Catchdf$listCatchSpikes2[i])
+  #Create window around value
+  Neuron1DeltaMin=Neuron1-delta
+  Neuron1DeltaMax=Neuron1+delta
+  #Check if Neuron2 spikes are between Neuron1 spikes+- delta
+  
+  CoincObs=c()
+  for(j in 1:length(Neuron2)){
+    NInf=(Neuron2[j]>=Neuron1DeltaMin)#check if value in Neuron2 are >=Neuron1DeltaMin
+    NSup=(Neuron2[j]<=Neuron1DeltaMax)#check if value in Neuron2 are <=Neuron1DeltaMin
+    Coinc=NInf*NSup#Vector that indicates if Neuron2 value is in one of interval Neuron1 
+    Coinc=sum(Coinc)
+    CoincObs=c(CoincObs,Coinc)
+  }
+Coincidences=c(Coincidences,CoincObs)
+}
+return(Coincidences)
+}
+```
+
+
+Test
+```{r}
+testCC1=CoincCount(neuron1simu,neuron2simu,0.02,0.2,0.1)
+testCC=CoincCount(neuron1simu,neuron2simu,1.2,1.4,0.1)
+sum(testCC1)/41#[1] 28.63415
+sum(testCC)/41
+```
+
+
+
+
+#MTGAUE
+
+
+De???nition 5: MTGAUE
+- For each W in the collection W of possible overlapping windows, compute the
+p-value of the symmetric GAUE test (see De???nition 3).
+- For a ???xed parameter q, which controls the FDR, order the p-values according to
+(34) and ???nd k satisfying (35).
+- Return as set of detections, the k windows corresponding to the k smallest p
+values.
+
+
+##Compute the p-value
+```{r}
+
+#Xb=x/nessai #nb coinc/essai
+#Y1b=a1/nessai  #nb spikes neuron 1 in window
+#Y2b=a2/nessai  #nb spikes neuron 2 in window
+
+Pvalue<-function(dataset1,dataset2,start,end,delta){
+
+
+Count=CountSpikePerWindow(dataset1,dataset2,start,end)
+Coinc=sum(CoincCount(dataset1,dataset2,start,end,delta))/nobs#mbarre
+print(paste("coinc ",Coinc))
+
+#start=0.02
+#end=0.2
+#delta=0.1
+
+duration=end-start  #T
+nobs=nrow(Count)   #M
+print(paste("nobs ",nobs))
+NmoyenCoinc=Coinc #mbarre 
+NmoyenNeur1=sum(Count[,1])/nobs
+NmoyenNeur2=sum(Count[,2])/nobs
+
+EstFiringRate1=NmoyenNeur1/(duration)#nb spikes neuron1 in window/duration window
+print(paste("EstFiringRate1 ",EstFiringRate1))
+EstFiringRate2=NmoyenNeur2/(duration) #nb spikes neuron2 in window/duration window
+print(paste("EstFiringRate2 ",EstFiringRate2))
+
+cc=2*delta*(duration)-delta^2
+
+EstNbmoyenCoinc=cc*EstFiringRate1*EstFiringRate2  #estmO
+
+EstV2=EstNbmoyenCoinc+(EstFiringRate1*EstFiringRate2*(EstFiringRate1+EstFiringRate2)*((2/3)*delta^3-((duration^-1)*delta^4)))
+
+EstVar=as.numeric(sqrt(nobs)*((NmoyenCoinc-EstNbmoyenCoinc)/sqrt(EstV2)))
+print(paste("EstVar ",EstVar))
+EstFunction=pnorm(abs(EstVar),mean = 0, sd = 1)#pnorm gives the distribution function.Gives the area under the standard normal curve to the left of EstVar. Test abs(EstVar)>=N(0,1)
+print(paste("EstFunction ",EstFunction))
+#EstVar tend vers 1
+#Abs(EstVar) tend vers N(0,1)
+#Abs (EstVar)=z1 -alpha/2  (symmetric test)
+#We compare EstFunction=z1-alpha/2
+#(EstFunction-z1)=-alpha/2
+#2*(z1-EstFunction)>=alpha    Here Z1 sd tend vers 1
+pval=2*(1-EstFunction)
+print(paste("pval ",pval))
+return(pval)
+}
+pvaltest1=Pvalue(neuron1simu,neuron2simu,0.02,0.2,0.1)
+pvaltest2=Pvalue(neuron1simu,neuron2simu,1.2,1.4,0.1)
+```
+
+#p-value on window
+
+
+```{r}
+#split in k small windows
+```
+
+```{r}
+
+pvalWindow<-function(dataset1,dataset2,start,end,delta,k){	
+  duration=end-start
+  top=seq(from=start,to=(end-(duration/k)),length.out=k)
+  print(paste("Top ",top))
+  bottom=seq(from=(start+(duration/k)),to=end,length.out=k)
+  print(paste("Bottom ",bottom))
+  Wsmall=rbind(top,bottom)
+
+  nobs=nrow(neuron1simu)
+									
+  allpval=c()
+  allW=c()
+  
+for (i in 1:k)								
+  {
+
+  topsmall=Wsmall[1,i]#a
+  print(paste("topsmall ",topsmall))
+  bottomsmall=Wsmall[2,i]     #b
+  print(paste("bottomsmall ",bottomsmall))
+  pvali=Pvalue(dataset1,dataset2,start=topsmall,end=bottomsmall,delta)
+  print(paste("pvali",pvali))
+  allpval=c(allpval,pvali)
+  allW=c(allW,paste(topsmall,bottomsmall))
+}
+  result=rbind(allW,allpval)
+return(result)
+}
+
+f=pvalWindow(neuron1simu,neuron2simu,0,2,0.1,5)
+f2=pvalWindow(neuron1simu,neuron2simu,0,1,0.1,5)
+```
+
+
+#Compute all pvalues for the dataset
+```{r}
+#size: size of the window in seconds
+
+allpval<-function(dataset1,dataset2,start,end,delta,k,size){
+duration=end-start
+top=seq(from=start,to=(end-(duration/k)),length.out=k)
+bottom=seq(from=(start+(duration/k)),to=end,length.out=k)
+Wsmall=rbind(top,bottom)
+
+all_allpval=c()
+all_smallW=c()
+
+for(i in seq(start,end-size,size)){
+  temp_pval=pvalWindow(neuron1simu,neuron2simu,i,i+size,delta,k)
+  all_allpval=c(all_allpval,temp_pval[2,])
+  all_smallW=c(all_smallW,temp_pval[1,])
+}
+result=rbind(all_smallW,all_allpval)
+return(result)
+}
+```
+
+```{r}
+testall=allpval(neuron1simu,neuron2simu,0,2,0.1,5,1)
+```
+
+```{r}
+indep<-function(dataset1,dataset2,start,end,delta,k,size,alpha){
+  testall=allpval(dataset1,dataset2,start,end,delta,k,size)
+  ind=ifelse(testall[2,]<=alpha,"Dependant","Independant")
+  return(rbind(testall[1,],ind))
+}
+
+ind1=indep(neuron1simu,neuron2simu,0,2,0.1,5,1,0.05)
+
+```
+
+False Discorvery Rate
+```{r}
+labels=rbinom(length(ind1)/2,1,0.3)
+labels=ifelse(labels==0,"Independant","Dependant")
+t=table(ind1[2,],labels)
+FDR=t[2,1]
+
+```
+
+#########################Appendix: Discretization full development######################
+
+##Create interval of time
+```{r}
+#h=resolution
+#df=dataframe
+matinterval<-function(h,df){
+  lenmat=ceiling(max(df[,2:length(df)])/h)
+  mat=matrix(nrow=2,ncol=lenmat)
+  len=seq(1,lenmat,1)
+  i=1
+  for(item in len){
+          low=i*h-h/2
+          high=i*h+h/2
+          mat[1,i]=low
+          mat[2,i]=high
+          i=i+1
+    }
+return(mat) 
+  }
+```
+
+
+##Check if points of the dataset are in the interval
+```{r}
+#h= resolution
+#df=dataframe
+checkpoints<-function(h,df){
+  matinter=matinterval(h,df)
+  a=nrow(df)
+  b=ncol(matinter)
+  matpoint=matrix(nrow=a,ncol=b)
+  j=1
+  for(column in df[,2:length(df)]){
+  i=1
+  #print(paste("column",j))
+        #print(paste("row",i))
+    for(value in column){
+      #print(paste("value",value,"row",i,"column",j))
+      for(k in seq(1,ncol(matinter),1)){
+      if(value>=matinter[1,k] & value<=matinter[2,k]){
+        #print(paste("mat1",matinter[1,k]))
+        #print(paste("mat2",matinter[2,k]))
+        matpoint[i,k]=1}
+        else{
+          if(is.na(matpoint[i,k])){
+          matpoint[i,k]=0
+          }
+          else{
+            if(matpoint[i,k]==1){
+              matpoint[i,k]==1
+            }
+          }
+        }
+        #print(paste("k",k))
+      }
+      i=i+1 
+    }
+  j=j+1
+  }
+  return(matpoint)
+}
+
+```
+
+
+
+test
+```{r}
+test1<-neuron1simu[1:3,1:5]#5 first peaks for 3 obs (12 peaks, first row isn't taken in account)
+test2<-neuron2simu[1:3,1:5]
+m2<-matinterval(0.003,test2)#create intervals - row1: lower bound, row2: upper bound
+r2<-checkpoints(0.003,test2)#create a table - nrow=nobs, ncol=nintervals - 1 if value in the interval, else 0
+table(r2) #check if all the obs has been taken in account
+#if two peaks are in the same interval, 1 (because binary 0/1). So for test 2, last two peaks of row1 are in the same interval, and second and third of sceond obs same. So only 10 obs.
+```
+
+##Name column by the middle of the interval
+```{r}
+discretized<-function(h,df){
+col<-seq(0,max(df[,2:ncol(df)]),h)
+discret<-as.data.frame(checkpoints(h,df),row.names=rownames(df))
+colnames(discret)<-col
+return(discret)
+}
+```
+
+#test
+```{r}
+d2<-discretized(0.003,test1)
+sapply(d2,sum)
+```
+
+
+##Suppress column with no observations (intervals with no observations)
+```{r}
+discretizedh<-function(h,df){
+  discret<-discretized(h,df)
+  coltodrop=NULL
+  i=1
+  for(column in discret){
+    #print(sum(column))
+    #print(colnames(df[column]))
+    k=0
+    for(data in column){
+      k=k+data
+    }
+    #print(k)
+    if(k==0){
+      coltodrop=c(coltodrop,colnames(discret[i]))
+    }
+    i=i+1
+    
+    #discret=subset(discret,select=-c(coltodrop))
+  }
+  #print(coltodrop)
+  #print(length(coltodrop))
+  #print(length(discret))
+  for(value in coltodrop){
+    #print(name)
+  discret=discret[!(names(discret)%in% coltodrop)]
+  }
+  return(discret)
+}
+```
+
+test
+```{r}
+
+dsimu1<-discretizedh(0.003,neuron1simu)
+dsimu2<-discretizedh(0.003,neuron2simu)
+#0.069 is in common
+```
+
+#Probabilistic study of the coincidence count
+windows of length 0,1s
+firing rates less than 100 Hz = lambda
+h=0.003 or h=0.004
+
+##Table with all intervals
+```{r}
+dallsimu1<-discretized(0.003,test1)
+dallsimu2<-discretized(0.003,test2)
+sum(dallsimu1)#12
+sum(dallsimu2)#10
+```
+
+r=length(dall113)#175   max dall113=0.522=T
+(length(dall140)=334)
+h length window
+d=1 here
+r=T/(d*h)  =  0.522/(1*0.003)   d*h=bin
+
+##first method to count coincidences
+```{r}
+coincidence<-function(h,df1,df2){
+  a=discretized(h,df1)
+  b=discretized(h,df2)
+  lenmin<-min(length(a),length(b))
+  nrowmin<-min(nrow(df1),nrow(df2))
+  coinc<-matrix(nrow=nrowmin,ncol=lenmin)
+
+  for(i in seq(1,nrowmin,1)){
+    for(j in seq(1,lenmin,1)){
+      #print(paste("a",a[i,j],"b",b[i,j]))
+    if((a[i,j]==1 & b[i,j])==1){
+      coinc[i,j]=1
+    }
+      else{
+        coinc[i,j]=0
+      }
+    }
+    }
+  return(coinc)
+}
+```
+
+#Equal intervals
+```{r}
+equal<-function(h,df1,df2){
+  coin<-coincidence(h,df1,df2)
+  coin<-as.data.frame(coin)
+  
+  a=discretized(h,df1)
+  b=discretized(h,df2)
+  kkk<-c(colnames(a),colnames(b))
+  lll<-c()
+  for(i in kkk){
+  lll<-c(lll,as.numeric(i))
+  }
+  lll<-unique(sort(lll))
+  colnames(coin)<-lll
+  #coinxts<-xts(coinzoo)
+  #coinal<-align.time(xsaaftest, n=h)
+  return(coin)
+  
+}
+
+```
+
+```{r}
+equal1<-equal(0.003,neuron1simu,neuron2simu)
+```
+
+
+##Coincidence by window
+```{r}
+coinW<-function(W,h,df1,df2){
+  coin<-coincidence(h,df1,df2)
+  a=discretized(h,df1)
+  b=discretized(h,df2)
+  kkk<-c(colnames(a),colnames(b))
+  lll<-c()
+  for(i in kkk){
+  lll<-c(lll,as.numeric(i))
+  }
+  lll<-unique(sort(lll))
+  d=1
+  coinW<-matrix(nrow=nrow(coin),ncol=length(lll))
+  count=1
+  sum=0
+  for(i in 1:nrow(coin)){
+    print(paste("i   ",i))
+  for(j in 1:ncol(coin)){
+    if(d*lll[j]<W*count){
+      sum=sum+coin[i,j]
+      print(paste("sum     ",sum))
+    }
+    else{
+      coinW[i,count]=sum
+      count=count+1
+      sum=0
+    }
+    
+  }
+    return(coinW)
+  }
+  
+}
+
+```
+
+```{r}
+coinW1<-coinW(0.03,0.003,neuron1simu,neuron2simu)
+```
+
+###second method to count coincidences
+```{r}
+#h=resolution
+coincidence2<-function(h,df1,df2){
+  a=discretizedh(h,df1)
+  b=discretizedh(h,df2)
+  c=unique(sort(c(colnames(a),colnames(b))))
+  r=min(nrow(df1),nrow(df2))
+  coinc=matrix(nrow=r,nol=length(c))
+  
+  for(row in seq(0,r,1)){
+    col=1
+    if(! c[col] %in% colnames(a)| ! c[col] %in% colnames(b)){
+      coinc[row,col]==0}
+      else{
+        if(a[row,col]==0|b[row,col]==0){
+          coinc[row,col]==0}
+        else{
+          coinc[row,col]==1}
+      }
+    col=col+1
+  }
+    return(coinc)
+    }
+```
+
+
+##test length
+```{r}
+kkk<-c(colnames(dsimu1),colnames(dsimu2))
+lll<-c()
+for(i in kkk){
+  lll<-c(lll,as.numeric(i))
+}
+lll<-unique(sort(lll))
+```
+
+
+##test: check if it works
+```{r}
+coinc1<-coincidence(0.003,neuron1simu,neuron2simu)
+coinc2<-coincidence(1,0.003,neuron1simu,neuron2simu)
+sum(coinc1)==sum(coinc1)#TRUE if ok (316 coinc)
+table(coinc1)
+```
